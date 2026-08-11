@@ -172,7 +172,7 @@ func TestMiddlewareKeyFuncError(t *testing.T) {
 
 func TestIPKeyFunc(t *testing.T) {
 	t.Parallel()
-	fn := httplimit.IPKeyFunc("X-Forwarded-For")
+	fn := httplimit.IPKeyFunc()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("X-Forwarded-For", "198.51.100.7")
 	req.RemoteAddr = "203.0.113.1:9"
@@ -180,8 +180,11 @@ func TestIPKeyFunc(t *testing.T) {
 	if err != nil {
 		t.Fatalf("IPKeyFunc: %v", err)
 	}
-	if key != "198.51.100.7" {
-		t.Fatalf("key: got %q, want %q", key, "198.51.100.7")
+	if key != "203.0.113.1" {
+		t.Fatalf(
+			"key: got %q, want RemoteAddr host (ignore XFF)",
+			key,
+		)
 	}
 
 	req2 := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -196,6 +199,70 @@ func TestIPKeyFunc(t *testing.T) {
 			key,
 			"203.0.113.2",
 		)
+	}
+}
+
+func TestTrustedForwardedIPKeyFunc(t *testing.T) {
+	t.Parallel()
+	fn, err := httplimit.TrustedForwardedIPKeyFunc(
+		[]string{"10.0.0.0/8"},
+		"X-Forwarded-For",
+	)
+	if err != nil {
+		t.Fatalf("TrustedForwardedIPKeyFunc: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "10.0.0.1:9"
+	req.Header.Set(
+		"X-Forwarded-For",
+		"198.51.100.7, 10.0.0.1",
+	)
+	key, err := fn(req)
+	if err != nil {
+		t.Fatalf("trusted peer: %v", err)
+	}
+	if key != "198.51.100.7" {
+		t.Fatalf(
+			"trusted peer key: got %q, want %q",
+			key,
+			"198.51.100.7",
+		)
+	}
+
+	spoof := httptest.NewRequest(http.MethodGet, "/", nil)
+	spoof.RemoteAddr = "203.0.113.50:9"
+	spoof.Header.Set("X-Forwarded-For", "198.51.100.7")
+	key, err = fn(spoof)
+	if err != nil {
+		t.Fatalf("untrusted peer: %v", err)
+	}
+	if key != "203.0.113.50" {
+		t.Fatalf(
+			"untrusted peer key: got %q, want RemoteAddr",
+			key,
+		)
+	}
+}
+
+func TestTrustedForwardedIPKeyFuncValidation(t *testing.T) {
+	t.Parallel()
+	if _, err := httplimit.TrustedForwardedIPKeyFunc(
+		nil,
+		"X-Forwarded-For",
+	); err == nil {
+		t.Fatalf("empty trustedProxies: got nil error")
+	}
+	if _, err := httplimit.TrustedForwardedIPKeyFunc(
+		[]string{"10.0.0.0/8"},
+	); err == nil {
+		t.Fatalf("empty headers: got nil error")
+	}
+	if _, err := httplimit.TrustedForwardedIPKeyFunc(
+		[]string{"not-a-cidr"},
+		"X-Forwarded-For",
+	); err == nil {
+		t.Fatalf("invalid CIDR: got nil error")
 	}
 }
 
