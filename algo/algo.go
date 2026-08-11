@@ -1,6 +1,9 @@
 // Package algo implements pure rate-limit algorithms shared by
-// in-process stores. Redis Lua scripts in redisstore must keep
-// matching semantics; change both when altering behavior.
+// in-process stores (memory, postgresstore). It is a public
+// package of module github.com/deangrant/ratelimit-gopher;
+// breaking changes follow that module's semver. Redis Lua
+// scripts in redisstore must keep matching semantics; change
+// both when altering behavior.
 package algo
 
 import (

@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/deangrant/ratelimit-gopher"
-	"github.com/deangrant/ratelimit-gopher/internal/algo"
+	"github.com/deangrant/ratelimit-gopher/algo"
 )
 
 // clock provides the current time. Tests inject a fake implementation.

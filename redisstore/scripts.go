@@ -7,7 +7,7 @@ import (
 )
 
 // Lua scripts encode the same algorithm semantics as
-// github.com/deangrant/ratelimit-gopher/internal/algo. Keep them
+// github.com/deangrant/ratelimit-gopher/algo. Keep them
 // in sync when changing limiter math. now is always Redis TIME
 // (milliseconds) so multi-node apps share one clock.
 

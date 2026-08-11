@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/deangrant/ratelimit-gopher"
-	"github.com/deangrant/ratelimit-gopher/internal/algo"
+	"github.com/deangrant/ratelimit-gopher/algo"
 )
 
 func TestSlidingLogKeepsExactCutoff(t *testing.T) {
