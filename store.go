@@ -32,6 +32,11 @@ type Result struct {
 // resources (for example background workers). The context bounds that
 // wait; if the wait is aborted, the store remains stopped and Close may
 // return ctx.Err().
+//
+// A Take that observes the store as not stopped before Close sets the
+// stopped flag may still complete successfully (a brief allow-after-stop
+// window). Callers that need a hard drain should wait for in-flight
+// requests to finish outside the store.
 type Store interface {
 	Take(ctx context.Context, key string) (Result, error)
 	Close(ctx context.Context) error
