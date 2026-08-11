@@ -342,7 +342,7 @@ func TestCardinalityGrowth(t *testing.T) {
 	}
 	if count != n {
 		t.Fatalf(
-			"row count after %d distinct keys: got %d, want %d (no TTL until sweep)",
+			"row count after %d keys: got %d, want %d (no TTL)",
 			n,
 			count,
 			n,

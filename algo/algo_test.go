@@ -220,7 +220,7 @@ func TestFakeClockSuite(t *testing.T) {
 		}
 		if st.Prev != 2 || st.Count != 0 {
 			t.Fatalf(
-				"after one-window rotate: prev=%d count=%d, want prev=2 count=0",
+				"after one-window rotate: prev=%d count=%d, want 2/0",
 				st.Prev,
 				st.Count,
 			)
