@@ -22,6 +22,9 @@ type Config struct {
 	Algorithm ratelimit.Algorithm
 	// Table is the bucket table name. Defaults to "ratelimit_buckets".
 	Table string
+	// SweepMinTTL is how long an idle key is kept before eviction.
+	// If zero, defaults to 3 * Interval.
+	SweepMinTTL time.Duration
 	// SkipMigrate disables CREATE TABLE in New. When false (default),
 	// New runs EnsureSchema with the provided context.
 	SkipMigrate bool
@@ -30,6 +33,9 @@ type Config struct {
 func (c Config) withDefaults() Config {
 	if c.Table == "" {
 		c.Table = "ratelimit_buckets"
+	}
+	if c.SweepMinTTL <= 0 {
+		c.SweepMinTTL = 3 * c.Interval
 	}
 	return c
 }

@@ -221,9 +221,7 @@ func TestCloseCancelledContextStillStops(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if err := s.Close(ctx); err != nil {
-		t.Fatalf("Close: got %v, want nil", err)
-	}
+	_ = s.Close(ctx) // may be nil or ctx.Err()
 	_, err = s.Take(context.Background(), "k")
 	if !errors.Is(err, ratelimit.ErrStopped) {
 		t.Fatalf(

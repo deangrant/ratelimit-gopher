@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -18,15 +19,21 @@ var _ ratelimit.Store = (*Store)(nil)
 
 // Store is a PostgreSQL-backed rate limit store.
 type Store struct {
-	db       *sql.DB
-	tokens   uint64
-	interval time.Duration
-	algo     ratelimit.Algorithm
-	qSelect  string
-	qInsert  string
-	qUpdate  string
-	qCreate  string
-	stopped  atomic.Bool
+	db          *sql.DB
+	tokens      uint64
+	interval    time.Duration
+	algo        ratelimit.Algorithm
+	sweepTTL    time.Duration
+	qSelect     string
+	qInsert     string
+	qUpdate     string
+	qCreate     string
+	qIndex      string
+	qDeleteIdle string
+	stopped     atomic.Bool
+	closeOnce   sync.Once
+	stopSweep   chan struct{}
+	sweepDone   chan struct{}
 }
 
 // New creates a PostgreSQL-backed Store from cfg. When
@@ -44,6 +51,7 @@ func New(
 		tokens:   cfg.Tokens,
 		interval: cfg.Interval,
 		algo:     cfg.Algorithm,
+		sweepTTL: cfg.SweepMinTTL,
 		// Table names are validated by validateIdent before use.
 		qSelect: fmt.Sprintf(`
 SELECT tokens, level, count, prev,
@@ -79,20 +87,39 @@ CREATE TABLE IF NOT EXISTS %s (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   log_times JSONB NOT NULL DEFAULT '[]'
 )`, cfg.Table), //nolint:gosec // G201
+		qIndex: fmt.Sprintf(
+			`CREATE INDEX IF NOT EXISTS %s_updated_at_idx ON %s (updated_at)`,
+			cfg.Table,
+			cfg.Table,
+		), //nolint:gosec // G201
+		qDeleteIdle: fmt.Sprintf(
+			`DELETE FROM %s WHERE updated_at < $1`,
+			cfg.Table,
+		), //nolint:gosec // G201
+		stopSweep: make(chan struct{}),
+		sweepDone: make(chan struct{}),
 	}
 	if !cfg.SkipMigrate {
 		if err := s.EnsureSchema(ctx); err != nil {
 			return nil, err
 		}
 	}
+	go s.sweepLoop()
 	return s, nil
 }
 
-// EnsureSchema creates the bucket table if it does not exist.
+// EnsureSchema creates the bucket table and updated_at index
+// if they do not exist.
 func (s *Store) EnsureSchema(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx, s.qCreate); err != nil {
 		return fmt.Errorf(
 			"postgresstore: ensure schema: %w",
+			err,
+		)
+	}
+	if _, err := s.db.ExecContext(ctx, s.qIndex); err != nil {
+		return fmt.Errorf(
+			"postgresstore: ensure index: %w",
 			err,
 		)
 	}
@@ -144,12 +171,67 @@ func (s *Store) Take(
 	}, nil
 }
 
-// Close marks the store stopped before any wait. It does not
-// close the database handle. Close is idempotent; later Take
-// calls return ErrStopped. This backend does not wait on
-// owned resources.
-func (s *Store) Close(_ context.Context) error {
-	s.stopped.Store(true)
+// Close stops the sweeper and rejects subsequent Take calls.
+// Close marks the store stopped before waiting for the sweeper.
+// The context bounds the wait; if cancelled, the store stays
+// stopped and Close returns ctx.Err(). Close does not close the
+// database handle. Close is idempotent.
+func (s *Store) Close(ctx context.Context) error {
+	var wait <-chan struct{}
+	s.closeOnce.Do(func() {
+		s.stopped.Store(true)
+		close(s.stopSweep)
+		wait = s.sweepDone
+	})
+	if wait == nil {
+		if s.stopped.Load() {
+			return nil
+		}
+		return ctx.Err()
+	}
+	select {
+	case <-wait:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (s *Store) sweepLoop() {
+	defer close(s.sweepDone)
+	ticker := time.NewTicker(s.sweepTTL)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-s.stopSweep:
+			return
+		case <-ticker.C:
+			s.sweep()
+		}
+	}
+}
+
+func (s *Store) sweep() {
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		s.sweepTTL,
+	)
+	defer cancel()
+	cutoff := time.Now().UTC().Add(-s.sweepTTL)
+	_ = s.deleteIdle(ctx, cutoff)
+}
+
+func (s *Store) deleteIdle(
+	ctx context.Context,
+	cutoff time.Time,
+) error {
+	_, err := s.db.ExecContext(ctx, s.qDeleteIdle, cutoff)
+	if err != nil {
+		return fmt.Errorf(
+			"postgresstore: delete idle: %w",
+			err,
+		)
+	}
 	return nil
 }
 
