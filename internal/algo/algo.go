@@ -100,9 +100,7 @@ func takeToken(
 		st.Tokens--
 	}
 	needed := math.Max(0, 1-st.Tokens)
-	reset := now.Add(
-		time.Duration(needed / rate * float64(time.Second)),
-	).UTC()
+	reset := resetAfter(now, needed/rate)
 	rem := uint64(0)
 	if st.Tokens > 0 {
 		rem = uint64(math.Floor(st.Tokens))
@@ -134,9 +132,7 @@ func takeLeaky(
 		st.Level++
 	}
 	over := math.Max(0, st.Level-(capacity-1))
-	reset := now.Add(
-		time.Duration(over / rate * float64(time.Second)),
-	).UTC()
+	reset := resetAfter(now, over/rate)
 	rem := uint64(0)
 	left := capacity - st.Level
 	if left > 0 {
@@ -148,6 +144,16 @@ func takeLeaky(
 		Reset:     reset,
 		OK:        ok,
 	}
+}
+
+// resetAfter returns now plus waitSeconds, rounding the wait up
+// to whole milliseconds to match redisstore Lua Reset.
+func resetAfter(now time.Time, waitSeconds float64) time.Time {
+	if waitSeconds <= 0 {
+		return now.UTC()
+	}
+	ms := math.Ceil(waitSeconds * 1000)
+	return now.Add(time.Duration(ms) * time.Millisecond).UTC()
 }
 
 func takeFixed(

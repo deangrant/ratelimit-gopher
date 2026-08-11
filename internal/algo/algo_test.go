@@ -37,3 +37,58 @@ func TestSlidingLogKeepsExactCutoff(t *testing.T) {
 		)
 	}
 }
+
+func TestTokenResetCeilsMilliseconds(t *testing.T) {
+	t.Parallel()
+	now := time.Date(
+		2026, 8, 11, 12, 0, 0, 0, time.UTC,
+	)
+	// Empty bucket, capacity 1, interval 1.5ms → wait 1.5ms, ceil 2ms.
+	interval := 1500 * time.Microsecond
+	st := algo.State{
+		Tokens:    0,
+		UpdatedAt: now,
+	}
+	res := algo.Take(
+		ratelimit.TokenBucket,
+		1,
+		interval,
+		now,
+		&st,
+	)
+	if res.OK {
+		t.Fatalf("Take: got OK=true, want false")
+	}
+	got := res.Reset.Sub(now)
+	want := 2 * time.Millisecond
+	if got != want {
+		t.Fatalf("Reset wait: got %v, want %v", got, want)
+	}
+}
+
+func TestLeakyResetCeilsMilliseconds(t *testing.T) {
+	t.Parallel()
+	now := time.Date(
+		2026, 8, 11, 12, 0, 0, 0, time.UTC,
+	)
+	interval := 1500 * time.Microsecond
+	st := algo.State{
+		Level:     1,
+		UpdatedAt: now,
+	}
+	res := algo.Take(
+		ratelimit.LeakyBucket,
+		1,
+		interval,
+		now,
+		&st,
+	)
+	if res.OK {
+		t.Fatalf("Take: got OK=true, want false")
+	}
+	got := res.Reset.Sub(now)
+	want := 2 * time.Millisecond
+	if got != want {
+		t.Fatalf("Reset wait: got %v, want %v", got, want)
+	}
+}
