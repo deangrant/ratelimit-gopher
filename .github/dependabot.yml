@@ -1,0 +1,37 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: sunday
+    cooldown:
+      default-days: 21
+    open-pull-requests-limit: 25
+
+  - package-ecosystem: gomod
+    directory: /redisstore
+    schedule:
+      interval: weekly
+      day: sunday
+    cooldown:
+      default-days: 21
+    open-pull-requests-limit: 25
+
+  - package-ecosystem: gomod
+    directory: /postgresstore
+    schedule:
+      interval: weekly
+      day: sunday
+    cooldown:
+      default-days: 21
+    open-pull-requests-limit: 25
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: sunday
+    cooldown:
+      default-days: 21
+    open-pull-requests-limit: 5
