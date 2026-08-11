@@ -14,7 +14,8 @@ import (
 type Config struct {
 	// DB is the database handle. The caller owns it and must close it.
 	DB *sql.DB
-	// Tokens is the maximum number of tokens (capacity or window limit).
+	// Tokens is the maximum number of tokens (capacity or window
+	// limit). Must be in 1..ratelimit.MaxTokens.
 	Tokens uint64
 	// Interval is the refill period or window size.
 	Interval time.Duration
@@ -49,6 +50,12 @@ func (c Config) validate() error {
 	}
 	if c.Tokens == 0 {
 		return errors.New("postgresstore: Tokens must be > 0")
+	}
+	if c.Tokens > ratelimit.MaxTokens {
+		return fmt.Errorf(
+			"postgresstore: Tokens must be <= %d",
+			ratelimit.MaxTokens,
+		)
 	}
 	if c.Interval <= 0 {
 		return errors.New(

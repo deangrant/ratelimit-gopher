@@ -308,6 +308,13 @@ func TestNewValidation(t *testing.T) {
 			},
 		},
 		{
+			name: "tokens above MaxTokens",
+			cfg: memory.Config{
+				Tokens:   ratelimit.MaxTokens + 1,
+				Interval: time.Second,
+			},
+		},
+		{
 			name: "zero interval",
 			cfg: memory.Config{
 				Tokens:   1,
@@ -332,4 +339,16 @@ func TestNewValidation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNewAcceptsMaxTokens(t *testing.T) {
+	t.Parallel()
+	s, err := memory.New(memory.Config{
+		Tokens:   ratelimit.MaxTokens,
+		Interval: time.Second,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = s.Close(context.Background()) })
 }

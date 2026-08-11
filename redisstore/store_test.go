@@ -200,6 +200,14 @@ func TestNewValidation(t *testing.T) {
 	}
 	_, err = redisstore.New(redisstore.Config{
 		Client:   client,
+		Tokens:   ratelimit.MaxTokens + 1,
+		Interval: time.Second,
+	})
+	if err == nil {
+		t.Fatalf("tokens above MaxTokens: got nil error")
+	}
+	_, err = redisstore.New(redisstore.Config{
+		Client:   client,
 		Tokens:   1,
 		Interval: 500 * time.Microsecond,
 	})
@@ -213,6 +221,14 @@ func TestNewValidation(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("1ms interval: %v", err)
+	}
+	_, err = redisstore.New(redisstore.Config{
+		Client:   client,
+		Tokens:   ratelimit.MaxTokens,
+		Interval: time.Second,
+	})
+	if err != nil {
+		t.Fatalf("MaxTokens: %v", err)
 	}
 }
 

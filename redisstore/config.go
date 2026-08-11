@@ -14,7 +14,8 @@ import (
 type Config struct {
 	// Client is the Redis client. The caller owns it and must close it.
 	Client redis.Cmdable
-	// Tokens is the maximum number of tokens (capacity or window limit).
+	// Tokens is the maximum number of tokens (capacity or window
+	// limit). Must be in 1..ratelimit.MaxTokens.
 	Tokens uint64
 	// Interval is the refill period or window size.
 	// Must be at least 1ms; Redis scripts and PEXPIRE use
@@ -39,6 +40,12 @@ func (c Config) validate() error {
 	}
 	if c.Tokens == 0 {
 		return errors.New("redisstore: Tokens must be > 0")
+	}
+	if c.Tokens > ratelimit.MaxTokens {
+		return fmt.Errorf(
+			"redisstore: Tokens must be <= %d",
+			ratelimit.MaxTokens,
+		)
 	}
 	if c.Interval < time.Millisecond {
 		return errors.New(

@@ -156,6 +156,31 @@ func TestNewValidation(t *testing.T) {
 	if err == nil {
 		t.Fatalf("nil DB: got nil error")
 	}
+	_, err = postgresstore.New(
+		context.Background(),
+		postgresstore.Config{
+			DB:          &sql.DB{},
+			Tokens:      ratelimit.MaxTokens + 1,
+			Interval:    time.Second,
+			SkipMigrate: true,
+		},
+	)
+	if err == nil {
+		t.Fatalf("tokens above MaxTokens: got nil error")
+	}
+	_, err = postgresstore.New(
+		context.Background(),
+		postgresstore.Config{
+			DB:          &sql.DB{},
+			Tokens:      ratelimit.MaxTokens,
+			Interval:    time.Second,
+			Table:       "rl_max_tokens",
+			SkipMigrate: true,
+		},
+	)
+	if err != nil {
+		t.Fatalf("MaxTokens: %v", err)
+	}
 }
 
 func TestConfigRejectsBadTable(t *testing.T) {
