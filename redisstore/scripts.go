@@ -8,7 +8,8 @@ import (
 
 // Lua scripts encode the same algorithm semantics as
 // github.com/deangrant/ratelimit-gopher/internal/algo. Keep them
-// in sync when changing limiter math.
+// in sync when changing limiter math. now is always Redis TIME
+// (milliseconds) so multi-node apps share one clock.
 
 func scriptFor(algo ratelimit.Algorithm) (string, error) {
 	if !algo.Valid() {
@@ -33,13 +34,18 @@ func scriptFor(algo ratelimit.Algorithm) (string, error) {
 	}
 }
 
-// ARGV: capacity, rate, interval_ms, now_ms, ttl_ms
+// redisNowMS is shared Lua that sets now from Redis TIME.
+const redisNowMS = `
+local t = redis.call('TIME')
+local now = tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000)
+`
+
+// ARGV: capacity, rate, interval_ms, ttl_ms
 // Returns: allowed, limit, remaining, reset_ms
-const luaTokenBucket = `
+const luaTokenBucket = redisNowMS + `
 local capacity = tonumber(ARGV[1])
 local rate = tonumber(ARGV[2])
-local now = tonumber(ARGV[4])
-local ttl = tonumber(ARGV[5])
+local ttl = tonumber(ARGV[4])
 
 local data = redis.call('HMGET', KEYS[1], 'tokens', 'last')
 local tokens = tonumber(data[1])
@@ -70,11 +76,10 @@ redis.call('PEXPIRE', KEYS[1], ttl)
 return {allowed, capacity, remaining, reset_ms}
 `
 
-const luaLeakyBucket = `
+const luaLeakyBucket = redisNowMS + `
 local capacity = tonumber(ARGV[1])
 local rate = tonumber(ARGV[2])
-local now = tonumber(ARGV[4])
-local ttl = tonumber(ARGV[5])
+local ttl = tonumber(ARGV[4])
 
 local data = redis.call('HMGET', KEYS[1], 'level', 'last')
 local level = tonumber(data[1])
@@ -105,11 +110,10 @@ redis.call('PEXPIRE', KEYS[1], ttl)
 return {allowed, capacity, remaining, reset_ms}
 `
 
-const luaFixedWindow = `
+const luaFixedWindow = redisNowMS + `
 local limit = tonumber(ARGV[1])
 local interval = tonumber(ARGV[3])
-local now = tonumber(ARGV[4])
-local ttl = tonumber(ARGV[5])
+local ttl = tonumber(ARGV[4])
 
 local data = redis.call('HMGET', KEYS[1], 'count', 'end')
 local count = tonumber(data[1])
@@ -142,11 +146,10 @@ redis.call('PEXPIRE', KEYS[1], ttl)
 return {allowed, limit, remaining, window_end}
 `
 
-const luaSlidingLog = `
+const luaSlidingLog = redisNowMS + `
 local limit = tonumber(ARGV[1])
 local interval = tonumber(ARGV[3])
-local now = tonumber(ARGV[4])
-local ttl = tonumber(ARGV[5])
+local ttl = tonumber(ARGV[4])
 
 local cutoff = now - interval
 -- Exclusive max matches Go !ts.Before(cutoff): keep score == cutoff.
@@ -174,11 +177,10 @@ redis.call('PEXPIRE', KEYS[1], ttl)
 return {allowed, limit, remaining, reset_ms}
 `
 
-const luaSlidingCounter = `
+const luaSlidingCounter = redisNowMS + `
 local limit = tonumber(ARGV[1])
 local interval = tonumber(ARGV[3])
-local now = tonumber(ARGV[4])
-local ttl = tonumber(ARGV[5])
+local ttl = tonumber(ARGV[4])
 
 local data = redis.call('HMGET', KEYS[1], 'curr', 'prev', 'start')
 local curr = tonumber(data[1])

@@ -14,7 +14,8 @@ import (
 // Compile-time check.
 var _ ratelimit.Store = (*Store)(nil)
 
-// Store is a Redis-backed rate limit store.
+// Store is a Redis-backed rate limit store. Limiting math uses
+// Redis server TIME so multiple app nodes share one clock.
 type Store struct {
 	client   redis.Cmdable
 	tokens   uint64
@@ -47,7 +48,8 @@ func New(cfg Config) (*Store, error) {
 	}, nil
 }
 
-// Take takes one token for key if available.
+// Take takes one token for key if available. Elapsed time and
+// Reset are derived from Redis TIME, not the local process clock.
 func (s *Store) Take(
 	ctx context.Context,
 	key string,
@@ -59,8 +61,6 @@ func (s *Store) Take(
 		return ratelimit.Result{}, ratelimit.ErrStopped
 	}
 
-	now := time.Now().UTC()
-	nowMS := now.UnixMilli()
 	intervalMS := s.interval.Milliseconds()
 	ttlMS := s.ttl.Milliseconds()
 	rate := float64(s.tokens) / s.interval.Seconds()
@@ -72,7 +72,6 @@ func (s *Store) Take(
 		s.tokens,
 		rate,
 		intervalMS,
-		nowMS,
 		ttlMS,
 	).Result()
 	if err != nil {
