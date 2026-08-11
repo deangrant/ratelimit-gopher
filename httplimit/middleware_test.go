@@ -42,7 +42,7 @@ func TestMiddlewareAllowsAndSetsHeaders(t *testing.T) {
 		},
 	))
 
-	req := httptest.NewRequest(
+	req := httptest.NewRequestWithContext(context.Background(),
 		http.MethodGet,
 		"/",
 		nil,
@@ -111,7 +111,12 @@ func TestMiddlewareBlocksWithRetryAfter(t *testing.T) {
 		},
 	))
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(
+		context.Background(),
+		http.MethodGet,
+		"/",
+		nil,
+	)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -177,7 +182,12 @@ func TestMiddlewareKeyFuncError(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(
 		rec,
-		httptest.NewRequest(http.MethodGet, "/", nil),
+		httptest.NewRequestWithContext(
+			context.Background(),
+			http.MethodGet,
+			"/",
+			nil,
+		),
 	)
 	if called {
 		t.Fatalf("next handler called on key error")
@@ -193,7 +203,12 @@ func TestMiddlewareKeyFuncError(t *testing.T) {
 func TestIPKeyFunc(t *testing.T) {
 	t.Parallel()
 	fn := httplimit.IPKeyFunc()
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(
+		context.Background(),
+		http.MethodGet,
+		"/",
+		nil,
+	)
 	req.Header.Set("X-Forwarded-For", "198.51.100.7")
 	req.RemoteAddr = "203.0.113.1:9"
 	key, err := fn(req)
@@ -207,7 +222,12 @@ func TestIPKeyFunc(t *testing.T) {
 		)
 	}
 
-	req2 := httptest.NewRequest(http.MethodGet, "/", nil)
+	req2 := httptest.NewRequestWithContext(
+		context.Background(),
+		http.MethodGet,
+		"/",
+		nil,
+	)
 	req2.RemoteAddr = "203.0.113.2:9"
 	key, err = fn(req2)
 	if err != nil {
@@ -232,7 +252,12 @@ func TestTrustedForwardedIPKeyFunc(t *testing.T) {
 		t.Fatalf("TrustedForwardedIPKeyFunc: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := httptest.NewRequestWithContext(
+		context.Background(),
+		http.MethodGet,
+		"/",
+		nil,
+	)
 	req.RemoteAddr = "10.0.0.1:9"
 	req.Header.Set(
 		"X-Forwarded-For",
@@ -250,7 +275,12 @@ func TestTrustedForwardedIPKeyFunc(t *testing.T) {
 		)
 	}
 
-	spoof := httptest.NewRequest(http.MethodGet, "/", nil)
+	spoof := httptest.NewRequestWithContext(
+		context.Background(),
+		http.MethodGet,
+		"/",
+		nil,
+	)
 	spoof.RemoteAddr = "203.0.113.50:9"
 	spoof.Header.Set("X-Forwarded-For", "198.51.100.7")
 	key, err = fn(spoof)
@@ -264,7 +294,12 @@ func TestTrustedForwardedIPKeyFunc(t *testing.T) {
 		)
 	}
 
-	emptyHdr := httptest.NewRequest(http.MethodGet, "/", nil)
+	emptyHdr := httptest.NewRequestWithContext(
+		context.Background(),
+		http.MethodGet,
+		"/",
+		nil,
+	)
 	emptyHdr.RemoteAddr = "10.0.0.2:9"
 	emptyHdr.Header.Set("X-Forwarded-For", "")
 	key, err = fn(emptyHdr)
@@ -337,7 +372,12 @@ func TestMiddlewareErrStoppedReturns503(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(
 		rec,
-		httptest.NewRequest(http.MethodGet, "/", nil),
+		httptest.NewRequestWithContext(
+			context.Background(),
+			http.MethodGet,
+			"/",
+			nil,
+		),
 	)
 	if called {
 		t.Fatalf("next handler called on ErrStopped")
@@ -370,7 +410,12 @@ func TestMiddlewareTakeErrorReturns500(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(
 		rec,
-		httptest.NewRequest(http.MethodGet, "/", nil),
+		httptest.NewRequestWithContext(
+			context.Background(),
+			http.MethodGet,
+			"/",
+			nil,
+		),
 	)
 	if called {
 		t.Fatalf("next handler called on Take error")
@@ -405,7 +450,12 @@ func TestMiddlewareFailOpenAllowsOnTakeError(t *testing.T) {
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(
 		rec,
-		httptest.NewRequest(http.MethodGet, "/", nil),
+		httptest.NewRequestWithContext(
+			context.Background(),
+			http.MethodGet,
+			"/",
+			nil,
+		),
 	)
 	if !called {
 		t.Fatalf("next handler not called with FailOpen")

@@ -32,11 +32,16 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("ok\n"))
 	})
 
 	addr := ":8080"
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mw.Handle(mux),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
 	log.Printf("listening on %s", addr)
-	log.Fatal(http.ListenAndServe(addr, mw.Handle(mux)))
+	log.Fatal(srv.ListenAndServe())
 }

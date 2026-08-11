@@ -125,7 +125,7 @@ func TestDeleteIdle(t *testing.T) {
 	}
 
 	const table = "rl_test_delete_idle"
-	_, _ = db.Exec("DROP TABLE IF EXISTS " + table)
+	_, _ = db.ExecContext(context.Background(), "DROP TABLE IF EXISTS "+table)
 	s, err := New(ctx, Config{
 		DB:          db,
 		Tokens:      1,
@@ -138,13 +138,16 @@ func TestDeleteIdle(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		_ = s.Close(context.Background())
-		_, _ = db.Exec("DROP TABLE IF EXISTS " + table)
+		_, _ = db.ExecContext(
+			context.Background(),
+			"DROP TABLE IF EXISTS "+table,
+		)
 	})
 
 	if _, err := s.Take(ctx, "idle"); err != nil {
 		t.Fatalf("Take: %v", err)
 	}
-	_, err = db.Exec(
+	_, err = db.ExecContext(context.Background(),
 		`UPDATE `+table+` SET updated_at = $1 WHERE key = $2`,
 		time.Now().UTC().Add(-2*time.Hour),
 		"idle",
@@ -159,7 +162,7 @@ func TestDeleteIdle(t *testing.T) {
 		t.Fatalf("deleteIdle: %v", err)
 	}
 	var n int
-	err = db.QueryRow(
+	err = db.QueryRowContext(context.Background(),
 		`SELECT COUNT(*) FROM `+table+` WHERE key = $1`,
 		"idle",
 	).Scan(&n)

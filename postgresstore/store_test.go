@@ -51,7 +51,10 @@ func TestAlgorithmsAllowThenDeny(t *testing.T) {
 	for _, algo := range algos {
 		t.Run(algo.String(), func(t *testing.T) {
 			table := "rl_test_" + algo.String()
-			_, _ = db.Exec("DROP TABLE IF EXISTS " + table)
+			_, _ = db.ExecContext(
+				context.Background(),
+				"DROP TABLE IF EXISTS "+table,
+			)
 			ctx := context.Background()
 			s, err := postgresstore.New(ctx, postgresstore.Config{
 				DB:        db,
@@ -65,7 +68,10 @@ func TestAlgorithmsAllowThenDeny(t *testing.T) {
 			}
 			t.Cleanup(func() {
 				_ = s.Close(context.Background())
-				_, _ = db.Exec("DROP TABLE IF EXISTS " + table)
+				_, _ = db.ExecContext(
+					context.Background(),
+					"DROP TABLE IF EXISTS "+table,
+				)
 			})
 
 			for i := 0; i < 2; i++ {
@@ -96,7 +102,7 @@ func TestAlgorithmsAllowThenDeny(t *testing.T) {
 func TestConcurrentTake(t *testing.T) {
 	db := openTestDB(t)
 	table := "rl_test_concurrent"
-	_, _ = db.Exec("DROP TABLE IF EXISTS " + table)
+	_, _ = db.ExecContext(context.Background(), "DROP TABLE IF EXISTS "+table)
 	const limit = 30
 	ctx := context.Background()
 	s, err := postgresstore.New(ctx, postgresstore.Config{
@@ -110,7 +116,10 @@ func TestConcurrentTake(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		_ = s.Close(context.Background())
-		_, _ = db.Exec("DROP TABLE IF EXISTS " + table)
+		_, _ = db.ExecContext(
+			context.Background(),
+			"DROP TABLE IF EXISTS "+table,
+		)
 	})
 
 	var (
@@ -311,7 +320,7 @@ func TestNewCancelledContext(t *testing.T) {
 func TestCardinalityGrowth(t *testing.T) {
 	db := openTestDB(t)
 	const table = "rl_test_cardinality"
-	_, _ = db.Exec("DROP TABLE IF EXISTS " + table)
+	_, _ = db.ExecContext(context.Background(), "DROP TABLE IF EXISTS "+table)
 	ctx := context.Background()
 	s, err := postgresstore.New(ctx, postgresstore.Config{
 		DB:       db,
@@ -324,7 +333,10 @@ func TestCardinalityGrowth(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		_ = s.Close(context.Background())
-		_, _ = db.Exec("DROP TABLE IF EXISTS " + table)
+		_, _ = db.ExecContext(
+			context.Background(),
+			"DROP TABLE IF EXISTS "+table,
+		)
 	})
 
 	const n = 50
@@ -335,8 +347,8 @@ func TestCardinalityGrowth(t *testing.T) {
 		}
 	}
 	var count int
-	if err := db.QueryRow(
-		`SELECT COUNT(*) FROM ` + table,
+	if err := db.QueryRowContext(context.Background(),
+		`SELECT COUNT(*) FROM `+table,
 	).Scan(&count); err != nil {
 		t.Fatalf("COUNT: %v", err)
 	}
