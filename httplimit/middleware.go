@@ -176,15 +176,32 @@ func clientFromForwarded(
 }
 
 // Middleware rate limits HTTP handlers using a Taker and KeyFunc.
+// By default it fails closed on Take errors (500), except
+// ratelimit.ErrStopped which returns 503. WithFailOpen changes
+// Take errors to allow the request, matching the Store contract
+// that fail-open vs fail-closed is a caller policy choice.
 type Middleware struct {
-	taker   Taker
-	keyFunc KeyFunc
+	taker    Taker
+	keyFunc  KeyFunc
+	failOpen bool
+}
+
+// Option configures Middleware.
+type Option func(*Middleware)
+
+// WithFailOpen allows the request when Take returns an error
+// (including ErrStopped). Default is fail-closed.
+func WithFailOpen() Option {
+	return func(m *Middleware) {
+		m.failOpen = true
+	}
 }
 
 // NewMiddleware builds Middleware. taker and keyFunc must be non-nil.
 func NewMiddleware(
 	taker Taker,
 	keyFunc KeyFunc,
+	opts ...Option,
 ) (*Middleware, error) {
 	if taker == nil {
 		return nil, errors.New("httplimit: store is nil")
@@ -194,7 +211,11 @@ func NewMiddleware(
 			"httplimit: key function is nil",
 		)
 	}
-	return &Middleware{taker: taker, keyFunc: keyFunc}, nil
+	m := &Middleware{taker: taker, keyFunc: keyFunc}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m, nil
 }
 
 // Handle wraps next with rate limiting.
@@ -212,11 +233,15 @@ func (m *Middleware) Handle(next http.Handler) http.Handler {
 
 		res, err := m.taker.Take(r.Context(), key)
 		if err != nil {
-			http.Error(
-				w,
-				http.StatusText(http.StatusInternalServerError),
-				http.StatusInternalServerError,
-			)
+			if m.failOpen {
+				next.ServeHTTP(w, r)
+				return
+			}
+			status := http.StatusInternalServerError
+			if errors.Is(err, ratelimit.ErrStopped) {
+				status = http.StatusServiceUnavailable
+			}
+			http.Error(w, http.StatusText(status), status)
 			return
 		}
 

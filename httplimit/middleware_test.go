@@ -283,6 +283,107 @@ func TestNewMiddlewareNilArgs(t *testing.T) {
 	}
 }
 
+func TestMiddlewareErrStoppedReturns503(t *testing.T) {
+	t.Parallel()
+	mw, err := httplimit.NewMiddleware(
+		&errStore{err: ratelimit.ErrStopped},
+		func(*http.Request) (string, error) {
+			return "k", nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewMiddleware: %v", err)
+	}
+	called := false
+	h := mw.Handle(http.HandlerFunc(
+		func(http.ResponseWriter, *http.Request) {
+			called = true
+		},
+	))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(
+		rec,
+		httptest.NewRequest(http.MethodGet, "/", nil),
+	)
+	if called {
+		t.Fatalf("next handler called on ErrStopped")
+	}
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf(
+			"status: got %d, want 503",
+			rec.Code,
+		)
+	}
+}
+
+func TestMiddlewareTakeErrorReturns500(t *testing.T) {
+	t.Parallel()
+	mw, err := httplimit.NewMiddleware(
+		&errStore{err: errors.New("redis down")},
+		func(*http.Request) (string, error) {
+			return "k", nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewMiddleware: %v", err)
+	}
+	called := false
+	h := mw.Handle(http.HandlerFunc(
+		func(http.ResponseWriter, *http.Request) {
+			called = true
+		},
+	))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(
+		rec,
+		httptest.NewRequest(http.MethodGet, "/", nil),
+	)
+	if called {
+		t.Fatalf("next handler called on Take error")
+	}
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf(
+			"status: got %d, want 500",
+			rec.Code,
+		)
+	}
+}
+
+func TestMiddlewareFailOpenAllowsOnTakeError(t *testing.T) {
+	t.Parallel()
+	mw, err := httplimit.NewMiddleware(
+		&errStore{err: errors.New("redis down")},
+		func(*http.Request) (string, error) {
+			return "k", nil
+		},
+		httplimit.WithFailOpen(),
+	)
+	if err != nil {
+		t.Fatalf("NewMiddleware: %v", err)
+	}
+	called := false
+	h := mw.Handle(http.HandlerFunc(
+		func(w http.ResponseWriter, _ *http.Request) {
+			called = true
+			w.WriteHeader(http.StatusOK)
+		},
+	))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(
+		rec,
+		httptest.NewRequest(http.MethodGet, "/", nil),
+	)
+	if !called {
+		t.Fatalf("next handler not called with FailOpen")
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf(
+			"status: got %d, want 200",
+			rec.Code,
+		)
+	}
+}
+
 type stubStore struct{}
 
 func (stubStore) Take(
@@ -290,4 +391,15 @@ func (stubStore) Take(
 	string,
 ) (ratelimit.Result, error) {
 	return ratelimit.Result{OK: true, Limit: 1}, nil
+}
+
+type errStore struct {
+	err error
+}
+
+func (s *errStore) Take(
+	context.Context,
+	string,
+) (ratelimit.Result, error) {
+	return ratelimit.Result{}, s.err
 }
