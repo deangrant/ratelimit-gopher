@@ -163,12 +163,7 @@ func (s *Store) Take(
 			err,
 		)
 	}
-	return ratelimit.Result{
-		Limit:     r.Limit,
-		Remaining: r.Remaining,
-		Reset:     r.Reset,
-		OK:        r.OK,
-	}, nil
+	return r, nil
 }
 
 // Close stops the sweeper and rejects subsequent Take calls.

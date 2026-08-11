@@ -1,9 +1,11 @@
 // Package algo implements pure rate-limit algorithms shared by
 // in-process stores (memory, postgresstore). It is a public
 // package of module github.com/deangrant/ratelimit-gopher;
-// breaking changes follow that module's semver. Redis Lua
-// scripts in redisstore must keep matching semantics; change
-// both when altering behavior.
+// breaking changes follow that module's semver.
+//
+// Redis Lua scripts in redisstore must keep matching semantics;
+// change both when altering behavior. redisstore parity tests
+// compare algo and Lua outcomes and are the guard against drift.
 package algo
 
 import (
@@ -13,13 +15,8 @@ import (
 	"github.com/deangrant/ratelimit-gopher"
 )
 
-// Result is the outcome of one Take against algorithm state.
-type Result struct {
-	Limit     uint64
-	Remaining uint64
-	Reset     time.Time
-	OK        bool
-}
+// Result is the outcome of one Take; identical to ratelimit.Result.
+type Result = ratelimit.Result
 
 // State holds per-key limiter state for all algorithms.
 type State struct {

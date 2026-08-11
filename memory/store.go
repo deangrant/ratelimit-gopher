@@ -79,13 +79,7 @@ func (s *Store) Take(
 		b = newBucket(s.algo, s.tokens, s.interval, now)
 		sh.data[key] = b
 	}
-	r := b.take(now)
-	return ratelimit.Result{
-		Limit:     r.Limit,
-		Remaining: r.Remaining,
-		Reset:     r.Reset,
-		OK:        r.OK,
-	}, nil
+	return b.take(now), nil
 }
 
 // Close stops the sweeper and rejects subsequent Take calls.

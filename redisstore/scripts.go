@@ -8,7 +8,8 @@ import (
 
 // Lua scripts encode the same algorithm semantics as
 // github.com/deangrant/ratelimit-gopher/algo. Keep them
-// in sync when changing limiter math. now is always Redis TIME
+// in sync when changing limiter math; parity_test.go
+// compares algo and Lua outcomes. now is always Redis TIME
 // (milliseconds) so multi-node apps share one clock.
 
 func scriptFor(algo ratelimit.Algorithm) (string, error) {
