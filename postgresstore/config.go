@@ -21,6 +21,9 @@ type Config struct {
 	// Algorithm selects the limiting strategy. Zero value is TokenBucket.
 	Algorithm ratelimit.Algorithm
 	// Table is the bucket table name. Defaults to "ratelimit_buckets".
+	// Must be a lowercase unquoted PostgreSQL identifier starting
+	// with a letter, not a reserved word, and at most 47 characters
+	// (so the updated_at index name fits in 63 bytes).
 	Table string
 	// SweepMinTTL is how long an idle key is kept before eviction.
 	// If zero, defaults to 3 * Interval.
@@ -68,14 +71,61 @@ func validateIdent(name string) error {
 	if name == "" {
 		return errors.New("empty table name")
 	}
-	for _, r := range name {
-		if (r >= 'a' && r <= 'z') ||
-			(r >= 'A' && r <= 'Z') ||
-			(r >= '0' && r <= '9') ||
-			r == '_' {
-			continue
+	// Leave room for "_updated_at_idx" within PG's 63-byte limit.
+	const maxTableLen = 47
+	if len(name) > maxTableLen {
+		return fmt.Errorf(
+			"identifier too long (max %d)",
+			maxTableLen,
+		)
+	}
+	for i, r := range name {
+		ok := r >= 'a' && r <= 'z' ||
+			r >= '0' && r <= '9' ||
+			r == '_'
+		if i == 0 {
+			ok = r >= 'a' && r <= 'z'
 		}
-		return fmt.Errorf("invalid identifier %q", name)
+		if !ok {
+			return fmt.Errorf("invalid identifier %q", name)
+		}
+	}
+	if _, reserved := reservedIdents[name]; reserved {
+		return fmt.Errorf("reserved identifier %q", name)
 	}
 	return nil
+}
+
+// reservedIdents are PostgreSQL keywords unsafe as unquoted
+// table names in our interpolated DDL.
+var reservedIdents = map[string]struct{}{
+	"all": {}, "analyse": {}, "analyze": {}, "and": {},
+	"any": {}, "array": {}, "as": {}, "asc": {},
+	"asymmetric": {}, "authorization": {}, "binary": {},
+	"both": {}, "case": {}, "cast": {}, "check": {},
+	"collate": {}, "collation": {}, "column": {},
+	"concurrently": {}, "constraint": {}, "create": {},
+	"cross": {}, "current_catalog": {}, "current_date": {},
+	"current_role": {}, "current_schema": {},
+	"current_time": {}, "current_timestamp": {},
+	"current_user": {}, "default": {}, "deferrable": {},
+	"desc": {}, "distinct": {}, "do": {}, "else": {},
+	"end": {}, "except": {}, "false": {}, "fetch": {},
+	"for": {}, "foreign": {}, "freeze": {}, "from": {},
+	"full": {}, "grant": {}, "group": {}, "having": {},
+	"ilike": {}, "in": {}, "initially": {}, "inner": {},
+	"intersect": {}, "into": {}, "is": {}, "isnull": {},
+	"join": {}, "key": {}, "lateral": {}, "leading": {},
+	"left": {}, "like": {}, "limit": {}, "localtime": {},
+	"localtimestamp": {}, "natural": {}, "not": {},
+	"notnull": {}, "null": {}, "offset": {}, "on": {},
+	"only": {}, "or": {}, "order": {}, "outer": {},
+	"overlaps": {}, "placing": {}, "primary": {},
+	"references": {}, "returning": {}, "right": {},
+	"select": {}, "session_user": {}, "similar": {},
+	"some": {}, "symmetric": {}, "table": {},
+	"tablesample": {}, "then": {}, "to": {}, "trailing": {},
+	"true": {}, "union": {}, "unique": {}, "user": {},
+	"using": {}, "variadic": {}, "verbose": {}, "when": {},
+	"where": {}, "window": {}, "with": {}, "index": {},
 }

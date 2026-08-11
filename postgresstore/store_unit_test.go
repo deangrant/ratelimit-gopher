@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,15 +13,23 @@ import (
 
 func TestValidateIdent(t *testing.T) {
 	t.Parallel()
+	long48 := "a" + strings.Repeat("x", 47)
 	tests := []struct {
 		name    string
 		ident   string
 		wantErr bool
 	}{
 		{name: "ok", ident: "ratelimit_buckets", wantErr: false},
+		{name: "ok_alnum", ident: "rl_a1", wantErr: false},
 		{name: "empty", ident: "", wantErr: true},
 		{name: "spaces", ident: "bad name", wantErr: true},
 		{name: "inject", ident: "t;drop", wantErr: true},
+		{name: "leading_digit", ident: "1abc", wantErr: true},
+		{name: "mixed_case", ident: "User", wantErr: true},
+		{name: "reserved_select", ident: "select", wantErr: true},
+		{name: "reserved_user", ident: "user", wantErr: true},
+		{name: "leading_underscore", ident: "_leading", wantErr: true},
+		{name: "too_long", ident: long48, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
