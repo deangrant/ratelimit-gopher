@@ -73,6 +73,12 @@ func TestMiddlewareAllowsAndSetsHeaders(t *testing.T) {
 		httplimit.HeaderRateLimitReset,
 	); got == "" {
 		t.Fatalf("Reset header missing")
+	} else if _, err := time.Parse(http.TimeFormat, got); err != nil {
+		t.Fatalf(
+			"Reset header format: got %q, want HTTP-date: %v",
+			got,
+			err,
+		)
 	}
 }
 
@@ -122,6 +128,20 @@ func TestMiddlewareBlocksWithRetryAfter(t *testing.T) {
 	}
 	if got := rec.Header().Get(httplimit.HeaderRetryAfter); got == "" {
 		t.Fatalf("Retry-After header missing")
+	} else if _, err := time.Parse(http.TimeFormat, got); err != nil {
+		t.Fatalf(
+			"Retry-After format: got %q, want HTTP-date: %v",
+			got,
+			err,
+		)
+	}
+	reset := rec.Header().Get(httplimit.HeaderRateLimitReset)
+	if _, err := time.Parse(http.TimeFormat, reset); err != nil {
+		t.Fatalf(
+			"Reset format: got %q, want HTTP-date: %v",
+			reset,
+			err,
+		)
 	}
 }
 
@@ -240,6 +260,20 @@ func TestTrustedForwardedIPKeyFunc(t *testing.T) {
 	if key != "203.0.113.50" {
 		t.Fatalf(
 			"untrusted peer key: got %q, want RemoteAddr",
+			key,
+		)
+	}
+
+	emptyHdr := httptest.NewRequest(http.MethodGet, "/", nil)
+	emptyHdr.RemoteAddr = "10.0.0.2:9"
+	emptyHdr.Header.Set("X-Forwarded-For", "")
+	key, err = fn(emptyHdr)
+	if err != nil {
+		t.Fatalf("empty forwarded header: %v", err)
+	}
+	if key != "10.0.0.2" {
+		t.Fatalf(
+			"empty XFF key: got %q, want RemoteAddr",
 			key,
 		)
 	}

@@ -294,6 +294,55 @@ func TestTakeAfterClose(t *testing.T) {
 	}
 }
 
+func TestCloseCancelledContextStillStops(t *testing.T) {
+	t.Parallel()
+	s, err := memory.New(memory.Config{
+		Tokens:   1,
+		Interval: time.Second,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_ = s.Close(ctx) // may return ctx.Err() while waiting
+	_, err = s.Take(context.Background(), "k")
+	if !errors.Is(err, ratelimit.ErrStopped) {
+		t.Fatalf(
+			"Take after cancelled Close: got %v, want %v",
+			err,
+			ratelimit.ErrStopped,
+		)
+	}
+}
+
+func TestCloseIdempotent(t *testing.T) {
+	t.Parallel()
+	s, err := memory.New(memory.Config{
+		Tokens:   1,
+		Interval: time.Second,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if err := s.Close(context.Background()); err != nil {
+		t.Fatalf("Close #1: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := s.Close(ctx); err != nil {
+		t.Fatalf("Close #2: got %v, want nil", err)
+	}
+	_, err = s.Take(context.Background(), "k")
+	if !errors.Is(err, ratelimit.ErrStopped) {
+		t.Fatalf(
+			"Take after second Close: got %v, want %v",
+			err,
+			ratelimit.ErrStopped,
+		)
+	}
+}
+
 func TestNewValidation(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -351,4 +400,40 @@ func TestNewAcceptsMaxTokens(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	t.Cleanup(func() { _ = s.Close(context.Background()) })
+
+	res, err := s.Take(context.Background(), "k")
+	if err != nil {
+		t.Fatalf("Take: %v", err)
+	}
+	if !res.OK {
+		t.Fatalf("Take: got OK=false, want true")
+	}
+	wantRem := ratelimit.MaxTokens - uint64(1)
+	if res.Remaining != wantRem {
+		t.Fatalf(
+			"Remaining: got %d, want %d",
+			res.Remaining,
+			wantRem,
+		)
+	}
+}
+
+func TestMaxTokensLeakySmoke(t *testing.T) {
+	t.Parallel()
+	s, err := memory.New(memory.Config{
+		Tokens:    ratelimit.MaxTokens,
+		Interval:  time.Second,
+		Algorithm: ratelimit.LeakyBucket,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() { _ = s.Close(context.Background()) })
+	res, err := s.Take(context.Background(), "k")
+	if err != nil {
+		t.Fatalf("Take: %v", err)
+	}
+	if !res.OK {
+		t.Fatalf("Take: got OK=false, want true")
+	}
 }

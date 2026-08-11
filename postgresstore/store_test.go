@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"os"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -257,6 +258,39 @@ func TestCloseCancelledContextStillStops(t *testing.T) {
 	}
 }
 
+func TestCloseIdempotent(t *testing.T) {
+	t.Parallel()
+	s, err := postgresstore.New(
+		context.Background(),
+		postgresstore.Config{
+			DB:          &sql.DB{},
+			Tokens:      1,
+			Interval:    time.Second,
+			Table:       "rl_close_idem",
+			SkipMigrate: true,
+		},
+	)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if err := s.Close(context.Background()); err != nil {
+		t.Fatalf("Close #1: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := s.Close(ctx); err != nil {
+		t.Fatalf("Close #2: got %v, want nil", err)
+	}
+	_, err = s.Take(context.Background(), "k")
+	if !errors.Is(err, ratelimit.ErrStopped) {
+		t.Fatalf(
+			"Take after second Close: got %v, want %v",
+			err,
+			ratelimit.ErrStopped,
+		)
+	}
+}
+
 func TestNewCancelledContext(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
@@ -271,5 +305,47 @@ func TestNewCancelledContext(t *testing.T) {
 	// should surface during EnsureSchema ExecContext.
 	if err == nil {
 		t.Fatalf("New: got nil error, want error")
+	}
+}
+
+func TestCardinalityGrowth(t *testing.T) {
+	db := openTestDB(t)
+	const table = "rl_test_cardinality"
+	_, _ = db.Exec("DROP TABLE IF EXISTS " + table)
+	ctx := context.Background()
+	s, err := postgresstore.New(ctx, postgresstore.Config{
+		DB:       db,
+		Tokens:   10,
+		Interval: time.Minute,
+		Table:    table,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = s.Close(context.Background())
+		_, _ = db.Exec("DROP TABLE IF EXISTS " + table)
+	})
+
+	const n = 50
+	for i := 0; i < n; i++ {
+		key := "k" + strconv.Itoa(i)
+		if _, err := s.Take(ctx, key); err != nil {
+			t.Fatalf("Take %q: %v", key, err)
+		}
+	}
+	var count int
+	if err := db.QueryRow(
+		`SELECT COUNT(*) FROM ` + table,
+	).Scan(&count); err != nil {
+		t.Fatalf("COUNT: %v", err)
+	}
+	if count != n {
+		t.Fatalf(
+			"row count after %d distinct keys: got %d, want %d (no TTL until sweep)",
+			n,
+			count,
+			n,
+		)
 	}
 }

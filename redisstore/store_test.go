@@ -176,6 +176,32 @@ func TestCloseCancelledContextStillStops(t *testing.T) {
 	}
 }
 
+func TestCloseIdempotent(t *testing.T) {
+	t.Parallel()
+	s := newTestStore(
+		t,
+		ratelimit.TokenBucket,
+		1,
+		time.Second,
+	)
+	if err := s.Close(context.Background()); err != nil {
+		t.Fatalf("Close #1: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := s.Close(ctx); err != nil {
+		t.Fatalf("Close #2: got %v, want nil", err)
+	}
+	_, err := s.Take(context.Background(), "k")
+	if !errors.Is(err, ratelimit.ErrStopped) {
+		t.Fatalf(
+			"Take after second Close: got %v, want %v",
+			err,
+			ratelimit.ErrStopped,
+		)
+	}
+}
+
 func TestNewValidation(t *testing.T) {
 	t.Parallel()
 	mr := miniredis.RunT(t)
@@ -209,6 +235,14 @@ func TestNewValidation(t *testing.T) {
 	_, err = redisstore.New(redisstore.Config{
 		Client:   client,
 		Tokens:   1,
+		Interval: time.Microsecond,
+	})
+	if err == nil {
+		t.Fatalf("1µs interval: got nil error")
+	}
+	_, err = redisstore.New(redisstore.Config{
+		Client:   client,
+		Tokens:   1,
 		Interval: 500 * time.Microsecond,
 	})
 	if err == nil {
@@ -229,6 +263,37 @@ func TestNewValidation(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("MaxTokens: %v", err)
+	}
+}
+
+func TestMaxTokensTakeSmoke(t *testing.T) {
+	t.Parallel()
+	for _, algo := range []ratelimit.Algorithm{
+		ratelimit.TokenBucket,
+		ratelimit.LeakyBucket,
+	} {
+		t.Run(algo.String(), func(t *testing.T) {
+			t.Parallel()
+			s := newTestStore(
+				t,
+				algo,
+				ratelimit.MaxTokens,
+				time.Second,
+			)
+			res, err := s.Take(context.Background(), "k")
+			if err != nil {
+				t.Fatalf("Take: %v", err)
+			}
+			if !res.OK {
+				t.Fatalf("Take: got OK=false, want true")
+			}
+			if res.Limit != ratelimit.MaxTokens {
+				t.Fatalf(
+					"Limit: got %d, want MaxTokens",
+					res.Limit,
+				)
+			}
+		})
 	}
 }
 

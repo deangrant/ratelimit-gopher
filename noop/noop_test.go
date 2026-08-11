@@ -71,3 +71,24 @@ func TestCloseCancelledContextStillStops(t *testing.T) {
 		)
 	}
 }
+
+func TestCloseIdempotent(t *testing.T) {
+	t.Parallel()
+	s := noop.New()
+	if err := s.Close(context.Background()); err != nil {
+		t.Fatalf("Close #1: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := s.Close(ctx); err != nil {
+		t.Fatalf("Close #2: got %v, want nil", err)
+	}
+	_, err := s.Take(context.Background(), "any")
+	if !errors.Is(err, ratelimit.ErrStopped) {
+		t.Fatalf(
+			"Take after second Close: got %v, want %v",
+			err,
+			ratelimit.ErrStopped,
+		)
+	}
+}
