@@ -1,0 +1,13 @@
+---
+description: httplimit middleware Taker surface, headers, and fail-open policy
+globs: httplimit/**
+alwaysApply: false
+---
+
+# httplimit
+
+- Depend on `httplimit.Taker` (`Take` only), not full `ratelimit.Store` (ISP).
+- Set `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`; on deny use 429 + `Retry-After`.
+- Default fail-closed: Take errors → 500; `ErrStopped` → 503. `WithFailOpen` allows the request on any Take error.
+- `IPKeyFunc` uses `RemoteAddr` only. Use `TrustedForwardedIPKeyFunc` only with a trusted proxy prefix list.
+- Nil `taker` / `keyFunc` must error at `NewMiddleware` (`httplimit: taker is nil`, etc.).

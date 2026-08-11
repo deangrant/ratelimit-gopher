@@ -1,0 +1,15 @@
+---
+description: Store Take/Close/ErrStopped/MaxTokens and client ownership contracts
+globs: store.go,**/store.go,**/config.go,noop/**,memory/**,redisstore/**,postgresstore/**
+alwaysApply: false
+---
+
+# Store contract
+
+- Implement `ratelimit.Store`: concurrent-safe `Take` / `Close`. Missing keys are created lazily (not an error).
+- After `Close`, later `Take` returns `ratelimit.ErrStopped`. `Close` is idempotent and marks stopped **before** waiting on owned resources.
+- Cap `Tokens` at `ratelimit.MaxTokens` (`(1<<53)-1`) in config validation.
+- Do **not** close caller-owned `redis.Cmdable` or `*sql.DB` in `Close`.
+- Redis: `Interval >= 1ms`. Memory/postgres: `Interval > 0`. Validate `Algorithm.Valid()` at construction.
+- Prefer `var _ ratelimit.Store = (*Store)(nil)` compile-time checks.
+- Details: skill `ratelimit-store`; checklist: `.agents/commands/new-store-checklist.md`.

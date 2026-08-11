@@ -1,0 +1,12 @@
+---
+description: Keep algo package and Redis Lua scripts semantically aligned
+globs: algo/**,redisstore/scripts.go,redisstore/parity_test.go
+alwaysApply: false
+---
+
+# Algo / Redis Lua parity
+
+- `algo` is the pure-Go reference. Redis reimplements the same math in Lua (`redisstore/scripts.go`).
+- Change both when altering algorithm behavior. Do not “fix” only one side.
+- After edits, run `.agents/commands/parity-redis.md` (`TestAlgoRedisParity`).
+- Redis clock is Redis `TIME`; sliding-log cutoffs and reset ceil-to-ms must stay aligned with `algo`.

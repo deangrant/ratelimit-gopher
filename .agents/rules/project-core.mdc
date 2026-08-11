@@ -1,0 +1,13 @@
+---
+description: Core ratelimit-gopher package, modules, style, and attribution rules
+alwaysApply: true
+---
+
+# Project core
+
+- Import path: `github.com/deangrant/ratelimit-gopher`. Package name: **`ratelimit`**.
+- Three Go modules: repo root, `redisstore/`, `postgresstore/`. Root `./...` skips the optional store modules; use `go build|test -C <dir>` (or `cd`) for each.
+- Enforce **80-column** lines (`.golangci.yml` lll/golines). Prefer Google Go style otherwise; see skill `google-go-style-guide`.
+- Never cite `sethvargo/go-limiter` or the BackendBytes rate-limit article in the tree.
+- After substantive Go changes, run `.agents/commands/verify-all.md` (or the equivalent shell).
+- Domain contracts: skill `ratelimit-store`. Design: skill `solid-go-design`.
