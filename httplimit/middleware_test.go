@@ -306,7 +306,7 @@ func TestNewMiddlewareNilArgs(t *testing.T) {
 		nil,
 		httplimit.IPKeyFunc(),
 	); err == nil {
-		t.Fatalf("nil store: got nil error")
+		t.Fatalf("nil taker: got nil error")
 	}
 	store := &stubStore{}
 	if _, err := httplimit.NewMiddleware(

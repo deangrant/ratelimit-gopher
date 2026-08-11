@@ -128,7 +128,14 @@ func asInt64(v any) (int64, error) {
 	case int64:
 		return x, nil
 	case string:
-		return strconv.ParseInt(x, 10, 64)
+		n, err := strconv.ParseInt(x, 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf(
+				"redisstore: parse int64: %w",
+				err,
+			)
+		}
+		return n, nil
 	default:
 		return 0, fmt.Errorf(
 			"redisstore: want int64, got %T",

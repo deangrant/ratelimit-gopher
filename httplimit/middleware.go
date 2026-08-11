@@ -204,7 +204,7 @@ func NewMiddleware(
 	opts ...Option,
 ) (*Middleware, error) {
 	if taker == nil {
-		return nil, errors.New("httplimit: store is nil")
+		return nil, errors.New("httplimit: taker is nil")
 	}
 	if keyFunc == nil {
 		return nil, errors.New(

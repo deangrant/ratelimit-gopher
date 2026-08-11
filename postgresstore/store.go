@@ -42,6 +42,9 @@ func New(
 	ctx context.Context,
 	cfg Config,
 ) (*Store, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	cfg = cfg.withDefaults()
 	if err := cfg.validate(); err != nil {
 		return nil, err
@@ -179,10 +182,7 @@ func (s *Store) Close(ctx context.Context) error {
 		wait = s.sweepDone
 	})
 	if wait == nil {
-		if s.stopped.Load() {
-			return nil
-		}
-		return ctx.Err()
+		return nil
 	}
 	select {
 	case <-wait:

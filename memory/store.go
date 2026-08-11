@@ -94,11 +94,7 @@ func (s *Store) Close(ctx context.Context) error {
 		wait = s.sweepDone
 	})
 	if wait == nil {
-		// Already closed on a prior call.
-		if s.stopped.Load() {
-			return nil
-		}
-		return ctx.Err()
+		return nil
 	}
 	select {
 	case <-wait:

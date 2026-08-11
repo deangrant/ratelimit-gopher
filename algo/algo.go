@@ -20,18 +20,31 @@ type Result = ratelimit.Result
 
 // State holds per-key limiter state for all algorithms.
 type State struct {
-	Tokens      float64
-	Level       float64
-	Count       int64
-	Prev        int64
+	// Tokens is the remaining token-bucket balance.
+	Tokens float64
+	// Level is the current leaky-bucket fill level.
+	Level float64
+	// Count is the request count in the current window
+	// (fixed/sliding-counter).
+	Count int64
+	// Prev is the previous window's count for
+	// sliding-window counter.
+	Prev int64
+	// WindowStart is the start of the current window.
 	WindowStart time.Time
-	WindowEnd   time.Time
-	UpdatedAt   time.Time
-	LogTimes    []time.Time
-	Accessed    time.Time
+	// WindowEnd is the end of the current window.
+	WindowEnd time.Time
+	// UpdatedAt is when state was last mutated.
+	UpdatedAt time.Time
+	// LogTimes are request timestamps for sliding-log.
+	LogTimes []time.Time
+	// Accessed is last Take time (idle sweep).
+	Accessed time.Time
 }
 
 // Fresh returns initial state for algo at now.
+// Callers should pass a Valid() algorithm; stores enforce
+// this at construction. Fresh does not validate algo.
 func Fresh(
 	algo ratelimit.Algorithm,
 	tokens uint64,
@@ -57,6 +70,8 @@ func Fresh(
 }
 
 // Take applies one request to st and returns the decision.
+// Callers should pass a Valid() algorithm; stores enforce
+// this at construction. Take does not validate algo.
 func Take(
 	algo ratelimit.Algorithm,
 	limit uint64,
