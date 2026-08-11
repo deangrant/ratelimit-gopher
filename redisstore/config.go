@@ -17,6 +17,8 @@ type Config struct {
 	// Tokens is the maximum number of tokens (capacity or window limit).
 	Tokens uint64
 	// Interval is the refill period or window size.
+	// Must be at least 1ms; Redis scripts and PEXPIRE use
+	// millisecond resolution.
 	Interval time.Duration
 	// Algorithm selects the limiting strategy. Zero value is TokenBucket.
 	Algorithm ratelimit.Algorithm
@@ -38,9 +40,9 @@ func (c Config) validate() error {
 	if c.Tokens == 0 {
 		return errors.New("redisstore: Tokens must be > 0")
 	}
-	if c.Interval <= 0 {
+	if c.Interval < time.Millisecond {
 		return errors.New(
-			"redisstore: Interval must be > 0",
+			"redisstore: Interval must be >= 1ms",
 		)
 	}
 	if !c.Algorithm.Valid() {

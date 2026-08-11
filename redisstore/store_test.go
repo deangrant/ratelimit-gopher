@@ -198,4 +198,20 @@ func TestNewValidation(t *testing.T) {
 	if err == nil {
 		t.Fatalf("zero tokens: got nil error")
 	}
+	_, err = redisstore.New(redisstore.Config{
+		Client:   client,
+		Tokens:   1,
+		Interval: 500 * time.Microsecond,
+	})
+	if err == nil {
+		t.Fatalf("sub-ms interval: got nil error")
+	}
+	_, err = redisstore.New(redisstore.Config{
+		Client:   client,
+		Tokens:   1,
+		Interval: time.Millisecond,
+	})
+	if err != nil {
+		t.Fatalf("1ms interval: %v", err)
+	}
 }
