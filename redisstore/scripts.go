@@ -149,7 +149,8 @@ local now = tonumber(ARGV[4])
 local ttl = tonumber(ARGV[5])
 
 local cutoff = now - interval
-redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', cutoff)
+-- Exclusive max matches Go !ts.Before(cutoff): keep score == cutoff.
+redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', '(' .. cutoff)
 local count = redis.call('ZCARD', KEYS[1])
 
 local allowed = 0

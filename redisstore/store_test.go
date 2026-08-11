@@ -215,3 +215,62 @@ func TestNewValidation(t *testing.T) {
 		t.Fatalf("1ms interval: %v", err)
 	}
 }
+
+func TestSlidingLogKeepsExactCutoff(t *testing.T) {
+	t.Parallel()
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{
+		Addr: mr.Addr(),
+	})
+	t.Cleanup(func() { _ = client.Close() })
+
+	const (
+		prefix   = "ratelimit:"
+		key      = "cutoff"
+		interval = time.Second
+	)
+	s, err := redisstore.New(redisstore.Config{
+		Client:    client,
+		Tokens:    1,
+		Interval:  interval,
+		Algorithm: ratelimit.SlidingWindowLog,
+		KeyPrefix: prefix,
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = s.Close(context.Background())
+	})
+
+	ctx := context.Background()
+	redisKey := prefix + key
+	intervalMS := interval.Milliseconds()
+	denied := false
+	for range 50 {
+		if err := client.Del(ctx, redisKey).Err(); err != nil {
+			t.Fatalf("Del: %v", err)
+		}
+		baseMS := time.Now().UnixMilli()
+		cutoff := baseMS - intervalMS
+		if err := client.ZAdd(ctx, redisKey, redis.Z{
+			Score:  float64(cutoff),
+			Member: "seed",
+		}).Err(); err != nil {
+			t.Fatalf("ZAdd: %v", err)
+		}
+		res, err := s.Take(ctx, key)
+		if err != nil {
+			t.Fatalf("Take: %v", err)
+		}
+		if !res.OK {
+			denied = true
+			break
+		}
+	}
+	if !denied {
+		t.Fatalf(
+			"Take with seed at cutoff: never denied (want keep)",
+		)
+	}
+}
