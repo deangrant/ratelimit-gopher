@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	github.com/deangrant/ratelimit-gopher v0.0.0
-	github.com/jackc/pgx/v5 v5.10.0
+	github.com/jackc/pgx/v5 v5.11.0
 )
 
 require (
