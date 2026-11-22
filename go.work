@@ -2,8 +2,8 @@ go 1.26.1
 
 use (
 	.
+	./examples/postgres
+	./examples/redis
 	./postgresstore
 	./redisstore
-	./examples/redis
-	./examples/postgres
 )
